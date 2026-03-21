@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your Project</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<section class="landing-page">
+    <div id="landing-bg"></div>
+    <div class="landing-content">
+        <p class="group-name">Nursultan Nurapin, Yuelin Jiang, Sumaid Lakho</p>
+        <h1 class="project-title">The Cost of Exclusion</h1>
+        <p class="project-description">
+            Schengen visa rejections disproportionately affect African and other nations, creating a multi-million euro burden on developing nations for their desire to travel.
+        </p>
+        <div class="landing-cta">
+            <a href="#explanation" class="btn-primary">Explore the Gap</a>
+        </div>
+    </div>
+</section>
+
+<section id="explanation" class="transition-page">
+    <div class="text-frame">
+        <p class="fade-up">
+            Obtaining a Schengen visa is not just a paperwork hurdle—it is a significant <b>financial risk</b> for applicants from many African countries.
+        </p>
+        <p class="fade-up">
+            While Europeans travel freely, applicants from outside often pay high fees that are <b>never refunded</b>, even if the visa is denied. 
+        </p>
+        <p class="fade-up">
+            High rejection rates for African and other developing nations mean millions of non-refundable fees are transferred to European states without a single travel visa being issued.
+        </p>
+    </div>
+    <p class="scroll-hint"><span>Scroll to see the imbalance</span><br><span class="arrow">↓</span></p>
+</section>
+
+    <section class="map-page">
+        <div class="map-header">
+            <h2 class="map-main-title">Visa Barriers & Lost Fees</h2>
+            <div class="map-controls">
+                <label class="map-controls__label" for="year-select">Choose year</label>
+                <select class="map-controls__select" id="year-select"></select>
+            </div>
+        </div>
+
+        <div id="click-suggestion" class="click-suggestion">
+            <span class="pulse-dot"></span> Suggestion: Move the globe and hover over countries to see more
+        </div>
+        <div id="click-result" class="click-result"></div>
+
+        <div id="map-vis"></div>
+    </section>
+
+<section id="salary-vis-section" class="salary-page">
+    <div class="salary-header">
+        <h2 class="salary-title">The Real Cost: Fee vs. Income</h2>
+    </div>
+    <div id="salary-container">
+        <div class="salary-info">
+            <h3 id="selected-country-name">No country selected</h3>
+            <div class="salary-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Avg. Monthly Salary</span>
+                    <span id="salary-value" class="stat-value">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Visa Fee</span>
+                    <span class="stat-value">90 EUR</span>
+                </div>
+                <div class="stat-item highlight">
+                    <span class="stat-label">Work Required</span>
+                    <span id="work-percentage" class="stat-value">-</span>
+                </div>
+            </div>
+            <p id="salary-description" class="salary-description">
+                Click a country on the globe above to see the comparison.
+            </p>
+        </div>
+        <div id="salary-vis"></div>
+        <div id="salary-vis-fallback" style="display:none; color: #9ca3af; font-size: 14px; margin-top: 20px;">
+            Rendering the country shape...
+        </div>
+    </div>
+</section>
+
+<section class="slicedRect">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="row justify-content-center">
+                    <div class="align-self-center">
+                        <h1>The Total Cost On Visa For Each Country</h1>
+                    </div>
+                </div>
+                <div class="row justify-content-center" style="height: 60vh">
+                    <div class="align-self-center" id="sliced-rect" style="height: 100%; width: 100%"></div>
+                    <div id="tooltip"></div>
+                </div>
+                <div class="row" style="height: 60vh">
+                    <div id="legend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="gates">
+    <div class="wrap">
+        <h1>Visa Gate Skyline</h1>
+        <p class="sub">
+            Gates show how “open” a reporting state is, depending on where people apply from.
+            Frame height = applications, blocked area = not issued.
+        </p>
+
+        <div class="controls">
+            <label>Reporting state
+                <select id="state"></select>
+            </label>
+
+            <label>Year
+                <select id="year"></select>
+            </label>
+
+            <label>Sort
+                <select id="sort">
+                    <option value="refusal">Refusal rate</option>
+                    <option value="apps">Applications</option>
+                </select>
+            </label>
+
+            <label>Show
+                <select id="topn">
+                    <option value="10">Top 10</option>
+                    <option value="20">Top 20</option>
+                    <option value="30" selected>Top 30</option>
+                    <option value="50">Top 50</option>
+                    <option value="9999">All</option>
+                </select>
+            </label>
+        </div>
+
+        <div id="chart"></div>
+
+        <div class="note">
+            <span class="dot"></span>
+            Labels show country codes (hover for full names). Higher refusal rate → more orange.
+        </div>
+
+        <p class="sub" style="margin-top:10px;font-size:12px;">
+            Source: European Union Visitor Visa Database (Schengen short-stay visa statistics, cleaned time series).
+        </p>
+    </div>
+</section>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script src="js/main.js"></script>
+<script src="js/mapVis.js"></script>
+<script src="js/salaryVis.js"></script>
+<script src="js/slicedRect.js"></script>
+<script src="js/gates.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
+</body>
+</html>
