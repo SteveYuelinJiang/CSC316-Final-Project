@@ -93,22 +93,21 @@ class FeeVis {
         this.geoData = geoData;
         this.rawData = rawData;
         this.fee = 90;
-        this.years = new Set(this.rawData.map(d => +d.reporting_year)); //console.log(this.years);
-        this.schengenCountries = new Set(this.rawData.map(d => d.reporting_state)); //console.log(this.schengenCountries);
+        this.years = new Set(this.rawData.map(d => +d.reporting_year));
+        this.schengenCountries = new Set(this.rawData.map(d => d.reporting_state));
 
         this.countryToContinent = {};
-        this.geoData.features.forEach(d => {
-            let country = d.properties.formal_en;
-            let continent = d.properties.continent;
-
-            this.countryToContinent[country] = continent;
-        }); //console.log(this.countryToContinent);
+        this.geoData.features.forEach(d => this.countryToContinent[d.properties.formal_en] = d.properties.continent);
 
         let groupedData = [];
 
-        this.rawData.filter(d => !this.schengenCountries.has(d.consulate_country) && !visaExemptCountries.has(d.consulate_country))
+        this.rawData
+            .filter(d =>
+                !this.schengenCountries.has(d.consulate_country) &&
+                !visaExemptCountries.has(d.consulate_country))
             .forEach(rd => {
                 let year = rd.reporting_year;
+                let applyingCountry = rd.consulate_country;
                 let applyingContinent = this.countryToContinent[rd.consulate_country];
                 let schengenCountry = rd.reporting_state;
                 let application = +rd.visitor_visa_applications;
@@ -117,13 +116,40 @@ class FeeVis {
 
                 if (!applyingContinent || application === 0) return;
 
-                let index = `${year}|${applyingContinent}|${schengenCountry}`;
-                let indexEU = `${year}|${applyingContinent}|EU`;
+                let indexCountrySchengen = `${year}|${applyingCountry}|${schengenCountry}`;
+                let indexCountryEU = `${year}|${applyingCountry}|EU`;
+                let indexContinentSchengen = `${year}|${applyingContinent}|${schengenCountry}`;
+                let indexContinentEU = `${year}|${applyingContinent}|EU`;
 
-                if (!groupedData[index]) {
-                     groupedData[index] = {
+                if (!groupedData[indexCountrySchengen]) {
+                    groupedData[indexCountrySchengen] = {
+                        year: year,
+                        applier: applyingCountry,
+                        level: "Country",
+                        schengenCountry: schengenCountry,
+                        application: application,
+                        issued: issued,
+                        notIssued: notIssued,
+                    };
+                }
+
+                if (!groupedData[indexCountryEU]) {
+                    groupedData[indexCountryEU] = {
+                        year: year,
+                        applier: applyingCountry,
+                        level: "Country",
+                        schengenCountry: "EU",
+                        application: 0,
+                        issued: 0,
+                        notIssued: 0,
+                    };
+                }
+
+                if (!groupedData[indexContinentSchengen]) {
+                     groupedData[indexContinentSchengen] = {
                          year: year,
-                         applyingContinent: applyingContinent,
+                         applier: applyingContinent,
+                         level: "Continent",
                          schengenCountry: schengenCountry,
                          application: 0,
                          issued: 0,
@@ -131,10 +157,11 @@ class FeeVis {
                     };
                 }
 
-                if (!groupedData[indexEU]) {
-                    groupedData[indexEU] = {
+                if (!groupedData[indexContinentEU]) {
+                    groupedData[indexContinentEU] = {
                         year: year,
-                        applyingContinent: applyingContinent,
+                        applier: applyingContinent,
+                        level: "Continent",
                         schengenCountry: "EU",
                         application: 0,
                         issued: 0,
@@ -142,12 +169,15 @@ class FeeVis {
                     };
                 }
 
-                groupedData[index].application += application;
-                groupedData[index].issued += issued;
-                groupedData[index].notIssued += notIssued;
-                groupedData[indexEU].application += application;
-                groupedData[indexEU].issued += issued;
-                groupedData[indexEU].notIssued += notIssued;
+                groupedData[indexCountryEU].application += application;
+                groupedData[indexCountryEU].issued += issued;
+                groupedData[indexCountryEU].notIssued += notIssued;
+                groupedData[indexContinentSchengen].application += application;
+                groupedData[indexContinentSchengen].issued += issued;
+                groupedData[indexContinentSchengen].notIssued += notIssued;
+                groupedData[indexContinentEU].application += application;
+                groupedData[indexContinentEU].issued += issued;
+                groupedData[indexContinentEU].notIssued += notIssued;
             });
 
         this.cleanedData = Object.values(groupedData);
@@ -156,7 +186,7 @@ class FeeVis {
             d.fee = d.application * this.fee;
             d.approvalRate = d.issued / d.application;
             d.refusalRate = d.notIssued / d.application;
-        }); //console.log(this.cleanedData);
+        });
     }
 
     async initVis() {
@@ -180,106 +210,266 @@ class FeeVis {
                     img.src = path;
                 });
             })
-        ); //console.log(this.euro);
+        );
 
         vis.margin = {top: 40, bottom: 40, left: 40, right: 40};
         vis.container = document.getElementById(vis.parentElement).getBoundingClientRect();
         vis.width = vis.container.width - vis.margin.left - vis.margin.right;
         vis.height = vis.container.height - vis.margin.top - vis.margin.bottom;
+        vis.gArea = vis.width * vis.height;
 
         vis.svg = d3.select("#" + vis.parentElement)
             .append("svg")
             .attr("width", vis.width + vis.margin.left + vis.margin.right)
-            .attr("height", vis.height + vis.margin.top + vis.margin.bottom)
-            .append("g")
+            .attr("height", vis.height + vis.margin.top + vis.margin.bottom);
+
+        vis.chart = vis.svg.append("g")
             .attr("transform", `translate(${vis.margin.left}, ${vis.margin.top})`);
 
-        vis.updateVis();
+        vis.legendGroup = vis.svg.append("g")
+            .attr("class", "legend")
+            .attr("transform", `translate(${vis.margin.left}, ${vis.height})`);
+
+        const xScale = d3.scaleLinear()
+            .domain([0, 6])
+            .range([0, 360]);
+
+        vis.legendGroup.append("line")
+            .attr("x1", xScale(0))
+            .attr("x2", xScale(6))
+            .attr("y1", 0)
+            .attr("y2", 0)
+            .attr("stroke", "white")
+            .attr("stroke-width", 2);
+
+        vis.legendGroup.selectAll(".tick")
+            .data([0, 1, 2, 3, 4, 5, 6])
+            .enter()
+            .append("line")
+            .attr("class", "tick")
+            .attr("x1", (d, i) => xScale(i))
+            .attr("x2", (d, i) => xScale(i))
+            .attr("y1", -10)
+            .attr("y2", 10)
+            .attr("stroke", "white")
+            .attr("stroke-width", 2);
+
+        vis.labels = vis.legendGroup.selectAll(".label")
+            .data([0, 1, 2, 3, 4, 5, 6])
+            .enter()
+            .append("text")
+            .attr("class", "label")
+            .attr("x", (d, i) => xScale(i))
+            .attr("y", -15)
+            .attr("text-anchor", "middle")
+            .attr("fill", "white")
+            .text("-");
+
+        vis.legendGroup.selectAll(".legend-img")
+            .data(vis.euro)
+            .enter()
+            .append("image")
+            .attr("class", "legend-img")
+            .attr("xlink:href", d => d.path)
+            .attr("x", (d, i) => xScale(i) + 10)
+            .attr("y", 15)
+            .attr("width", d => d.width / 10)
+            .attr("height", d => d.height / 10);
+
+        vis.updateVis(window.feeVisRegion, window.feeVisLevel);
     }
 
-    updateVis(region = "EU", year = 2005, mode = false) {
+    updateVis(region, level, year = 2005, mode = false) {
         let vis = this;
-        vis.centerX = vis.width / 2; console.log(vis.centerX);
-        vis.centerY = vis.height / 2; console.log(vis.centerY);
+        vis.chart.selectAll("*").remove();
+
+        vis.centerX = vis.width / 2;
+        vis.centerY = vis.height / 2 - 80;
+
+        d3.select("#" + vis.parentElement + "-title").text("The Fee Received by " + region);
+        d3.select("#the-one").text(region);
 
         let visData = [];
-        if (mode) {
-            visData = vis.cleanedData
-                .filter(d => d.schengenCountry === region && d.year === year)
-                .sort((a, b) => a.applyingContinent.localeCompare(b.applyingContinent));
-        }
+        if (mode) {}
         else {
             visData = vis.cleanedData
-                .filter(d => d.schengenCountry === region && d.year === year)
-                .sort((a, b) => a.applyingContinent.localeCompare(b.applyingContinent));
+                .filter(d => d.schengenCountry === region && d.year === year && d.level === level)
+                .sort((a, b) => a.applier.localeCompare(b.applier));
+        }
 
-        } //console.log(visData);
+        if (visData.length === 0) {
+            let text = vis.chart.append("text")
+                .attr("class", "no-data")
+                .attr("x", vis.centerX)
+                .attr("y", vis.centerY)
+                .attr("text-anchor", "middle")
+                .attr("dominant-baseline", "middle")
+                .style("fill", "#9ca3af")
+                .style("opacity", 1);
 
-        let totalFee = d3.sum(visData, d => d.fee); //console.log(totalFee);
-        let unitFee = celling6M(d3.max(visData, d => d.fee)) / 6; //console.log(unitFee);
-        let level = visData.map(d => Math.floor(d.fee / unitFee)); //console.log(level);
-        let rectData = visData.map((d, i) => {
-            let euro = vis.euro[level[i]];
+            text.append("tspan")
+                .attr("x", vis.centerX)
+                .attr("dy", 0)
+                .style("font-size", 20)
+                .text("No Data Reported By " + region + " In " + year);
+
+            text.append("tspan")
+                .attr("x", vis.centerX)
+                .attr("dy", "2em")
+                .style("font-size", 16)
+                .text("Click on the year on the left to select year");
+        }
+
+        let totalFee = d3.sum(visData, d => d.fee);
+        let unitFee = celling3M(d3.max(visData, d => d.fee)) / 6;
+        let rectData = visData.map(d => {
+            let euro = vis.euro[Math.floor(d.fee / unitFee)];
             let ratio = euro.ratio;
             let path = euro.path;
-            let size = d.fee / totalFee * 40000;
+            let size = d.fee / totalFee * vis.gArea / visData.length + 3000;
             return {
+                text: d.applier,
+                fee: Math.round(d.fee / 1000) / 1000 + "M",
                 width: Math.sqrt(size * ratio),
                 height: Math.sqrt(size / ratio),
                 path: path,
-                x: 0,
-                y: 0,
             };
-        }); console.log(rectData);
+        });
 
-        packCornersDynamic(rectData, vis.centerX, vis.centerY, 10);
 
-        vis.rects = vis.svg.selectAll("image")
+
+        rectPacking(rectData, vis.centerX, vis.centerY);
+
+        vis.chart.selectAll(".vis-image")
             .data(rectData)
             .join("image")
-            .attr("x", d => d.x)
-            .attr("y", d => d.y)
+            .attr("class", "vis-image")
             .attr("width", d => d.width)
             .attr("height", d => d.height)
-            .attr("href", d => d.path);
+            .attr("href", d => d.path)
+            .attr("x", d => d.x)
+            .attr("y", d => d.y);
+
+        let cells = vis.chart.selectAll(".cell")
+            .data(rectData)
+            .join("g")
+            .attr("class", "cell");
+
+        cells.selectAll(".vis-rect")
+            .data(d => [d])
+            .join("rect")
+            .attr("class", "vis-rect")
+            .attr("width", d => d.width)
+            .attr("height", d => d.height)
+            .attr("x", d => d.x)
+            .attr("y", d => d.y)
+            .attr("fill", "black")
+            .attr("opacity", 0);
+
+        let cellText = cells.selectAll(".vis-text")
+            .data(d => [d])
+            .join("text")
+            .attr("class", "vis-text")
+            .attr("x", d => d.x + d.width/2)
+            .attr("y", d => d.y + d.height/2)
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "middle")
+            .style("opacity", 0)
+            .style("fill", "white")
+
+        cellText.append("tspan")
+            .attr("x", d => d.x + d.width/2)
+            .attr("dy", "-0.5em")
+            .style("font-size", d => d3.min([d.width / d.text.length * 1.85, 16]))
+            .text(d => d.text);
+
+        cellText.append("tspan")
+            .attr("x", d => d.x + d.width/2)
+            .attr("dy", "1em")
+            .style("font-size", 16)
+            .text(d => d.fee);
+
+        cells.on("mouseover", function () {
+            d3.select(this).select("text")
+                .transition().duration(200)
+                .style("opacity", 1);
+            d3.select(this).select("rect")
+                .transition().duration(200)
+                .style("opacity", 0.3);
+            })
+            .on("mouseout", function () {
+                d3.select(this).select("text")
+                    .transition().duration(200)
+                    .style("opacity", 0);
+                d3.select(this).select("rect")
+                    .transition().duration(200)
+                    .style("opacity", 0);
+            });
+
+        vis.labels.data([0, 1, 2, 3, 4, 5, 6])
+            .text(d => {
+                if (unitFee) return d * unitFee / 1000000 + "M";
+                else return "-";
+            });
     }
 }
 
-function celling6M(num) {
-    return Math.ceil(num/6000000) * 6000000;
+function celling3M(num) {
+    return Math.ceil(num/3000000) * 3000000;
 }
 
-function overlaps(a, b, gap = 8) {
+function isOverlap(a, b, margin) {
     return !(
-        a.x + a.width/2 + gap < b.x - b.width/2 ||
-        a.x - a.width/2 - gap > b.x + b.width/2 ||
-        a.y + a.height/2 + gap < b.y - b.height/2 ||
-        a.y - a.height/2 - gap > b.y + b.height/2
+        a.x + a.width + margin < b.x - margin ||
+        a.x - margin > b.x + b.width + margin ||
+        a.y + a.height + margin < b.y - margin ||
+        a.y - margin > b.y + b.height + margin
     );
 }
 
-function packCornersDynamic(rects, centerX, centerY, gap = 10) {
-    let quarterIndex = 0;
-    let placedRects = [[],[],[],[]];
+function rectPacking(rects, centerX, centerY, margin = 5) {
+    let placedRects = [[], [], [], []];
+    let index = 0;
 
-    rects.forEach(rect => {
-        if (quarterIndex % 4 === 0) {
-            rect.x = centerX - rect.width - gap / 2;
-            rect.y = centerY - rect.height - gap / 2;
-        }
-        else if (quarterIndex % 4 === 1) {
-            rect.x = gap / 2;
-            rect.y = centerY - rect.height - gap / 2;
-        }
-        else if (quarterIndex % 4 === 2) {
-            rect.x = gap / 2;
-            rect.y = gap / 2;
-        }
-        else if (quarterIndex % 4 === 3) {
-            rect.x = centerX - rect.width - gap / 2;
-            rect.y = gap / 2;
-        }
-    }); console.log(rects);
+    rects.forEach((r, i) => {
+        if (i === 0) {r.x = centerX - r.width - margin; r.y = centerY - r.height - margin; placedRects[i].push(r);}
+        if (i === 1) {r.x = centerX + margin; r.y = centerY - r.height - margin; placedRects[i].push(r);}
+        if (i === 2) {r.x = centerX + margin; r.y = centerY + margin; placedRects[i].push(r);}
+        if (i === 3) {r.x = centerX - r.width - margin; r.y = centerY + margin; placedRects[i].push(r);}
 
-    return rects;
+        if (i >= 4) {
+            r.x = centerX - r.width / 2;
+            r.y = centerY - r.height / 2;
+
+            while (placedRects[index % 4].some(pr => isOverlap(pr, r, margin)) &&
+            placedRects[(index+1) % 4].some(pr => isOverlap(pr, r, margin)))
+            {
+                if (index % 4 === 0) r.y--
+                if (index % 4 === 1) r.x++
+                if (index % 4 === 2) r.y++
+                if (index % 4 === 3) r.x--
+            }
+
+            if (placedRects[index % 4].some(pr => isOverlap(pr, r, margin))) {
+                while (placedRects[index % 4].some(pr => isOverlap(pr, r, margin))) {
+                    if (index % 4 === 0) r.x++
+                    if (index % 4 === 1) r.y++
+                    if (index % 4 === 2) r.x--
+                    if (index % 4 === 3) r.y--
+                }
+
+                index++;
+            }
+            else {
+                while (placedRects[(index+1) % 4].some(pr => isOverlap(pr, r, margin))) {
+                    if (index % 4 === 0) r.x--
+                    if (index % 4 === 1) r.y--
+                    if (index % 4 === 2) r.x++
+                    if (index % 4 === 3) r.y++
+                }
+            }
+
+            placedRects[index % 4].push(r);
+        }
+    });
 }

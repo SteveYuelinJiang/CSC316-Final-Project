@@ -190,8 +190,27 @@ async function init() {
 
     initLandingVis();
 
-    let feeVis = new FeeVis("fee-vis-chart", geoData, rawData);
+    window.feeVis = new FeeVis("fee-vis", geoData, rawData);
+    window.feeVisRegion = "EU";
+    window.feeVisLevel = "Country";
     await feeVis.initVis();
+
+    d3.select("#fee-vis-year-selector")
+        .selectAll("option")
+        .data(years)
+        .join("option")
+        .attr("value", d => d)
+        .text(d => d);
+
+    d3.select("#fee-vis-year-selector").on("change", function () {
+        const selectedYear = +this.value;
+
+        feeVis.updateVis(
+            window.feeVisRegion,
+            window.feeVisLevel,
+            selectedYear
+        );
+    });
 }
 
 function initLandingVis() {
